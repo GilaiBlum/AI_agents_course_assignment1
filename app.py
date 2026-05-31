@@ -1,15 +1,18 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import os
+from dotenv import load_dotenv 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pinecone import Pinecone
 from langchain_core.messages import SystemMessage, HumanMessage
 
-# Credentials 
-LLMOD_API_KEY = os.environ.get("LLMOD_API_KEY", "fallback-key-for-local-testing")
+load_dotenv() 
+
+# Credentials
+LLMOD_API_KEY = os.environ.get("LLMOD_API_KEY")
 LLMOD_BASE_URL = "https://api.llmod.ai/v1"
-PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "fallback-key-for-local-testing")
-INDEX_NAME = "your-index-name" # You can safely hardcode your index name
+PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
+INDEX_NAME = "assignment1"
 
 # RAG Hyperparameters
 CHUNK_SIZE = 256
