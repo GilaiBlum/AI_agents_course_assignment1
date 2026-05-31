@@ -5,21 +5,18 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pinecone import Pinecone
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from KEYS import API_KEY, PINECONE_KEY
-
-# --- 1. Credentials ---
-LLMOD_API_KEY = API_KEY
+# Credentials 
+LLMOD_API_KEY = os.environ.get("LLMOD_API_KEY", "fallback-key-for-local-testing")
 LLMOD_BASE_URL = "https://api.llmod.ai/v1"
-PINECONE_API_KEY = PINECONE_KEY
-INDEX_NAME = "assignment1"
+PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "fallback-key-for-local-testing")
+INDEX_NAME = "your-index-name" # You can safely hardcode your index name
 
-# --- 2. RAG Hyperparameters ---
-# Endpoint /api/stats must reflect these exactly
-CHUNK_SIZE = 512
-OVERLAP_RATIO = 0.2
-TOP_K = 7
+# RAG Hyperparameters
+CHUNK_SIZE = 256
+OVERLAP_RATIO = 0.3
+TOP_K = 15
 
-# --- 3. Initialize Clients ---
+# Initialize Clients 
 emb = OpenAIEmbeddings(
     api_key=LLMOD_API_KEY,
     base_url=LLMOD_BASE_URL,
@@ -37,11 +34,11 @@ index = pc.Index(INDEX_NAME)
 
 app = FastAPI()
 
-# --- 4. Data Models for API ---
+# Data Models for API 
 class PromptRequest(BaseModel):
     question: str
 
-# --- 5. Mandatory System Prompt ---
+# Mandatory System Prompt 
 SYSTEM_PROMPT_TEMPLATE = """You are a Medium-article assistant that answers questions strictly and only based on the Medium articles dataset context provided to you (metadata and article passages). 
 You must not use any external knowledge, the open internet, or information that is not explicitly contained in the retrieved context. If the answer cannot be determined from the provided context, respond: "I don't know based on the provided Medium articles data."
 Always explain your answer using the given context, quoting or paraphrasing the relevant article passage or metadata when helpful.
@@ -50,7 +47,7 @@ Context provided:
 {context_str}
 """
 
-# --- 6. Endpoints ---
+# Endpoints
 
 @app.get("/api/stats")
 def get_stats():
@@ -66,23 +63,23 @@ def generate_prompt(request: PromptRequest):
     """Handles the core RAG logic."""
     question = request.question
     
-    # 1. Embed the user's question
+    # Embed the user's question
     question_vector = emb.embed_query(question)
     
-    # 2. Retrieve top-k chunks from Pinecone
+    # Retrieve top-k chunks from Pinecone
     search_results = index.query(
         vector=question_vector,
         top_k=TOP_K,
         include_metadata=True
     )
     
-    # 3. Format the retrieved context for the output and the LLM
+    # Format the retrieved context for the output and the LLM
     context_list = []
     context_text_for_llm = ""
     
-    for match in search_results['matches']:
-        metadata = match['metadata']
-        score = match['score']
+    for match in search_results.get('matches', []):
+        metadata = match.get('metadata', {})
+        score = match.get('score', 0.0)
         
         # Build the array requested in the assignment output format
         context_list.append({
@@ -92,13 +89,13 @@ def generate_prompt(request: PromptRequest):
             "score": score
         })
         
-        # Build the readable string for the LLM's system prompt
-        context_text_for_llm += f"\n--- Article ID: {metadata.get('article_id')} | Title: {metadata.get('title')} ---\n{metadata.get('chunk')}\n"
+        # Build the readable string for the LLM's system prompt (INCLUDING AUTHOR!)
+        context_text_for_llm += f"\n--- Title: {metadata.get('title')} | Author: {metadata.get('author', 'Unknown')} ---\n{metadata.get('chunk')}\n"
     
-    # 4. Construct the Prompts
+    # Construct the Prompts
     final_system_prompt = SYSTEM_PROMPT_TEMPLATE.replace("{context_str}", context_text_for_llm)
     
-    # 5. Call the Chat Model
+    # Call the Chat Model
     messages = [
         SystemMessage(content=final_system_prompt),
         HumanMessage(content=question)
@@ -106,7 +103,7 @@ def generate_prompt(request: PromptRequest):
     
     response = llm.invoke(messages)
     
-    # 6. Return the exact structured JSON format
+    # Return the exact structured JSON format
     return {
         "response": response.content,
         "context": context_list,
