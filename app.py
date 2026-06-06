@@ -12,7 +12,7 @@ load_dotenv()
 LLMOD_API_KEY = os.environ.get("LLMOD_API_KEY")
 LLMOD_BASE_URL = "https://api.llmod.ai/v1"
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
-INDEX_NAME = "assignment1"
+INDEX_NAME = "individual-assignment" 
 
 # RAG Hyperparameters
 CHUNK_SIZE = 256
@@ -92,7 +92,7 @@ def generate_prompt(request: PromptRequest):
             "score": score
         })
         
-        # Build the readable string for the LLM's system prompt (INCLUDING AUTHOR!)
+        # Build the readable string for the LLM's system prompt
         context_text_for_llm += f"\n--- Title: {metadata.get('title')} | Author: {metadata.get('author', 'Unknown')} ---\n{metadata.get('chunk')}\n"
     
     # Construct the Prompts
